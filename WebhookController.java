@@ -1,5 +1,6 @@
 package com.example.linechatbot.LineBot;
 
+import com.example.linechatbot.User.model.UserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linecorp.bot.client.LineMessagingClient;
 import com.linecorp.bot.model.ReplyMessage;
@@ -29,6 +30,11 @@ public class WebhookController {
     private LineMessagingClient lineMessagingClient;
 
     private final ObjectMapper objectMapper = ModelObjectMapper.createNewObjectMapper();
+    private final UserService userService;
+
+    public WebhookController(UserService userService) {
+        this.userService = userService;
+    }
 
     @PostMapping("/callback")
     public String callback(@RequestBody String payload) throws Exception {
@@ -46,11 +52,19 @@ public class WebhookController {
 
     private void handleMessageEvent(MessageEvent<?> event) {
         if (event.getMessage() instanceof TextMessageContent) {
-            TextMessageContent messageContent = (TextMessageContent) event.getMessage();
             String replyToken = event.getReplyToken();
-            String userMessage = messageContent.getText().toLowerCase();
+            String userMessage = ((TextMessageContent) event.getMessage()).getText().toLowerCase();
 
-            // ถ้าพูดถึง "ราคา" แสดง Flex
+            // ดึง userId และขอ LINE profile
+            String userId = event.getSource().getUserId();
+            lineMessagingClient.getProfile(userId).whenComplete((profile, ex) -> {
+                if (ex == null) {
+                    String displayName = profile.getDisplayName();
+                    // 💾 Save เข้า DB
+                    userService.saveUserIfNotExists(userId, displayName);
+                }
+            });
+
             if (userMessage.contains("ราคา")) {
                 replyWithFlexMessage(replyToken);
             } else {
