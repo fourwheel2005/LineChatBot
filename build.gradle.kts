@@ -31,7 +31,7 @@ dependencies {
 	implementation("com.squareup.retrofit2:retrofit:2.9.0")
 	implementation("com.linecorp.bot:line-bot-spring-boot:5.0.0")
 	implementation("org.springframework.boot:spring-boot-starter-data-jpa")
-	implementation("org.postgresql:postgresql")
+	implementation("org.postgresql:postgresql:42.6.0")
 	compileOnly("org.projectlombok:lombok")
 	developmentOnly("org.springframework.boot:spring-boot-devtools")
 	annotationProcessor("org.projectlombok:lombok")
