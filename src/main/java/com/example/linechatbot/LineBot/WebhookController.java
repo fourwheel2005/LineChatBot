@@ -54,7 +54,7 @@ public class WebhookController {
 
     private String processBusinessLogic(String input) {
         try {
-            URL url = new URL("http://localhost:5000/analyze");
+            URL url = new URL("https://intent-api.onrender.com");
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/json; utf-8");
