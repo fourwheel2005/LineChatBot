@@ -58,14 +58,20 @@ public class WebhookController {
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/json; utf-8");
+            conn.setRequestProperty("Accept", "application/json");
             conn.setDoOutput(true);
 
             String jsonInput = "{\"text\":\"" + input + "\"}";
+            System.out.println("Sending to: " + url);
+            System.out.println("Payload: " + jsonInput);
 
             try (OutputStream os = conn.getOutputStream()) {
                 byte[] inputBytes = jsonInput.getBytes(StandardCharsets.UTF_8);
                 os.write(inputBytes, 0, inputBytes.length);
             }
+
+            int responseCode = conn.getResponseCode();
+            System.out.println("Response Code: " + responseCode);
 
             StringBuilder response = new StringBuilder();
             try (BufferedReader br = new BufferedReader(
@@ -76,7 +82,8 @@ public class WebhookController {
                 }
             }
 
-            String intent = new ObjectMapper().readTree(response.toString()).get("intent").asText();
+            JsonNode jsonNode = objectMapper.readTree(response.toString());
+            String intent = jsonNode.get("intent").asText();
 
             return switch (intent) {
                 case "contact" -> "คุณสามารถติดต่อเราได้ที่เบอร์โทร: 089-968-6309 หรือ Line ID: @capseal";
@@ -86,6 +93,7 @@ public class WebhookController {
             };
 
         } catch (Exception e) {
+            System.err.println("Error calling intent API: " + e.getMessage());
             e.printStackTrace();
             return "ขออภัย ระบบไม่สามารถประมวลผลคำถามของคุณได้ในขณะนี้ครับ";
         }
