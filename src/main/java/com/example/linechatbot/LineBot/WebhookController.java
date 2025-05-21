@@ -1,5 +1,6 @@
 package com.example.linechatbot.LineBot;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linecorp.bot.client.LineMessagingClient;
 import com.linecorp.bot.model.ReplyMessage;
@@ -12,9 +13,11 @@ import com.linecorp.bot.model.objectmapper.ModelObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.*;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ExecutionException;
 
 @RestController
 public class WebhookController {
@@ -49,26 +52,45 @@ public class WebhookController {
         }
     }
 
-    private final Map<String, String> keywordResponses = Map.of(
-            "ติดต่อ", "คุณสามารถติดต่อเราได้ที่เบอร์โทร: 089-968-6309 หรือ Line ID: @capseal",
-            "โทร", "เบอร์โทรสำหรับติดต่อคือ: 089-968-6309 ครับ",
-            "ราคา", "ราคาแคปซีลเริ่มต้นที่ 1.50 บาทต่อชิ้น (ขึ้นอยู่กับขนาดและปริมาณสั่ง) ครับ",
-            "สั่งซื้อ", "หากสนใจสั่งซื้อสามารถติดต่อผ่าน Line ID: @capseal หรือโทร 089-968-6309 ได้เลยครับ"
-    );
-
     private String processBusinessLogic(String input) {
-        String message = input.toLowerCase();
+        try {
+            URL url = new URL("http://localhost:5000/analyze");
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Content-Type", "application/json; utf-8");
+            conn.setDoOutput(true);
 
-        for (Map.Entry<String, String> entry : keywordResponses.entrySet()) {
-            if (message.contains(entry.getKey())) {
-                return entry.getValue();
+            String jsonInput = "{\"text\":\"" + input + "\"}";
+
+            try (OutputStream os = conn.getOutputStream()) {
+                byte[] inputBytes = jsonInput.getBytes(StandardCharsets.UTF_8);
+                os.write(inputBytes, 0, inputBytes.length);
             }
+
+            StringBuilder response = new StringBuilder();
+            try (BufferedReader br = new BufferedReader(
+                    new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+                String responseLine;
+                while ((responseLine = br.readLine()) != null) {
+                    response.append(responseLine.trim());
+                }
+            }
+
+            JsonNode jsonNode = objectMapper.readTree(response.toString());
+            String intent = jsonNode.get("intent").asText();
+
+            return switch (intent) {
+                case "contact" -> "คุณสามารถติดต่อเราได้ที่เบอร์โทร: 089-968-6309 หรือ Line ID: @capseal";
+                case "price" -> "ราคาแคปซีลเริ่มต้นที่ 1.50 บาทต่อชิ้น (ขึ้นอยู่กับขนาดและปริมาณสั่ง) ครับ";
+                case "order" -> "หากสนใจสั่งซื้อสามารถติดต่อผ่าน Line ID: @capseal หรือโทร 089-968-6309 ได้เลยครับ";
+                default -> "สวัสดีครับ ยินดีต้อนรับสู่ บริษัทสรรชัยพลาสติกมั่นคงจำกัด หากท่านต้องการสอบถามเกี่ยวกับแคปซีล เช่น ราคา เบอร์โทร หรือสั่งซื้อ พิมพ์มาได้เลยครับ!";
+            };
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "ขออภัย ระบบไม่สามารถประมวลผลคำถามของคุณได้ในขณะนี้ครับ";
         }
-
-        return "คุณพิมพ์ว่า: " + input + " หากต้องการสอบถามเกี่ยวกับแคปซีล เช่น ราคา เบอร์โทร หรือสั่งซื้อ พิมพ์มาได้เลยครับ!";
     }
-
-
 
     private void replyToUser(String replyToken, String message) {
         TextMessage reply = new TextMessage(message);
