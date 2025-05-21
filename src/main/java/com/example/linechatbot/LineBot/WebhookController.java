@@ -54,7 +54,7 @@ public class WebhookController {
 
     private String processBusinessLogic(String input) {
         try {
-            URL url = new URL("https://intent-api.onrender.com");
+            URL url = new URL("https://intent-api.onrender.com/analyze");
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/json; utf-8");
@@ -76,14 +76,13 @@ public class WebhookController {
                 }
             }
 
-            JsonNode jsonNode = objectMapper.readTree(response.toString());
-            String intent = jsonNode.get("intent").asText();
+            String intent = new ObjectMapper().readTree(response.toString()).get("intent").asText();
 
             return switch (intent) {
                 case "contact" -> "คุณสามารถติดต่อเราได้ที่เบอร์โทร: 089-968-6309 หรือ Line ID: @capseal";
                 case "price" -> "ราคาแคปซีลเริ่มต้นที่ 1.50 บาทต่อชิ้น (ขึ้นอยู่กับขนาดและปริมาณสั่ง) ครับ";
                 case "order" -> "หากสนใจสั่งซื้อสามารถติดต่อผ่าน Line ID: @capseal หรือโทร 089-968-6309 ได้เลยครับ";
-                default -> "สวัสดีครับ ยินดีต้อนรับสู่ บริษัทสรรชัยพลาสติกมั่นคงจำกัด หากท่านต้องการสอบถามเกี่ยวกับแคปซีล เช่น ราคา เบอร์โทร หรือสั่งซื้อ พิมพ์มาได้เลยครับ!";
+                default -> "สวัสดีครับ ยินดีต้อนรับสู่บริษัทสรรชัยพลาสติกมั่นคงจำกัด หากท่านต้องการสอบถามเกี่ยวกับแคปซีล เช่น ราคา เบอร์โทร หรือสั่งซื้อ พิมพ์มาได้เลยครับ!";
             };
 
         } catch (Exception e) {
