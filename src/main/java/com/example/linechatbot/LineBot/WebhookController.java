@@ -56,7 +56,7 @@ public class WebhookController {
 
     private String processBusinessLogic(String input) {
         int maxRetries = 2;
-        int retryDelayMillis = 1000; // ลดเหลือ 1 วินาที
+        int retryDelayMillis = 1000;
 
         for (int attempt = 1; attempt <= maxRetries; attempt++) {
             try {
@@ -64,9 +64,15 @@ public class WebhookController {
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
                 conn.setRequestProperty("Content-Type", "application/json; utf-8");
+                conn.setRequestProperty("Accept", "application/json");
+                conn.setRequestProperty("User-Agent", "Java-LineBot/1.0");
                 conn.setDoOutput(true);
+                conn.setConnectTimeout(3000);
+                conn.setReadTimeout(5000);
 
                 String jsonInput = "{\"text\":\"" + input + "\"}";
+                System.out.println("Calling: " + url);
+                System.out.println("Payload: " + jsonInput);
 
                 try (OutputStream os = conn.getOutputStream()) {
                     byte[] inputBytes = jsonInput.getBytes(StandardCharsets.UTF_8);
@@ -74,18 +80,20 @@ public class WebhookController {
                 }
 
                 int status = conn.getResponseCode();
+                System.out.println("HTTP Status: " + status);
 
                 if (status == 200) {
                     StringBuilder response = new StringBuilder();
                     try (BufferedReader br = new BufferedReader(
                             new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
-                        String responseLine;
-                        while ((responseLine = br.readLine()) != null) {
-                            response.append(responseLine.trim());
+                        String line;
+                        while ((line = br.readLine()) != null) {
+                            response.append(line.trim());
                         }
                     }
 
-                    String intent = new ObjectMapper().readTree(response.toString()).get("intent").asText();
+                    JsonNode node = new ObjectMapper().readTree(response.toString());
+                    String intent = node.has("intent") ? node.get("intent").asText() : "unknown";
 
                     return switch (intent) {
                         case "contact" -> "คุณสามารถติดต่อเราได้ที่เบอร์โทร: 089-968-6309 หรือ Line ID: @capseal";
@@ -95,6 +103,15 @@ public class WebhookController {
                     };
                 } else {
                     System.out.println("Attempt " + attempt + " failed with HTTP " + status);
+                    try (BufferedReader br = new BufferedReader(
+                            new InputStreamReader(conn.getErrorStream(), StandardCharsets.UTF_8))) {
+                        StringBuilder errorResponse = new StringBuilder();
+                        String line;
+                        while ((line = br.readLine()) != null) {
+                            errorResponse.append(line.trim());
+                        }
+                        System.out.println("Error Body: " + errorResponse.toString());
+                    }
                 }
 
             } catch (IOException e) {
@@ -102,7 +119,7 @@ public class WebhookController {
             }
 
             try {
-                Thread.sleep(retryDelayMillis); // รอแป๊บเดียว
+                Thread.sleep(retryDelayMillis);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 break;
@@ -111,6 +128,7 @@ public class WebhookController {
 
         return "ขออภัย ระบบไม่สามารถประมวลผลคำถามของคุณได้ในขณะนี้ครับ";
     }
+
 
     private void replyToUser(String replyToken, String message) {
         TextMessage reply = new TextMessage(message);
