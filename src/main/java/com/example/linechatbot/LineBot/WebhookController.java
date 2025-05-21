@@ -95,7 +95,7 @@ public class WebhookController {
         } catch (Exception e) {
             System.err.println("Error calling intent API: " + e.getMessage());
             e.printStackTrace();
-            return "ขออภัย ระบบไม่สามารถประมวลผลคำถามของคุณได้ในขณะนี้ครับ";
+            return "ขออภัยในความไม่สะดวกระบบกำลังปรับปรุงในขณะนี้ครับ :)";
         }
     }
 
