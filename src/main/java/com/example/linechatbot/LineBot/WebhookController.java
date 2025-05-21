@@ -53,51 +53,63 @@ public class WebhookController {
     }
 
     private String processBusinessLogic(String input) {
-        try {
-            URL url = new URL("https://intent-api.onrender.com/analyze");
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("POST");
-            conn.setRequestProperty("Content-Type", "application/json; utf-8");
-            conn.setRequestProperty("Accept", "application/json");
-            conn.setDoOutput(true);
+        int maxRetries = 3;
+        int retryDelayMillis = 2000; // หน่วงเวลา 2 วินาที
 
-            String jsonInput = "{\"text\":\"" + input + "\"}";
-            System.out.println("Sending to: " + url);
-            System.out.println("Payload: " + jsonInput);
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                URL url = new URL("https://intent-api.onrender.com/analyze");
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("Content-Type", "application/json; utf-8");
+                conn.setDoOutput(true);
 
-            try (OutputStream os = conn.getOutputStream()) {
-                byte[] inputBytes = jsonInput.getBytes(StandardCharsets.UTF_8);
-                os.write(inputBytes, 0, inputBytes.length);
-            }
+                String jsonInput = "{\"text\":\"" + input + "\"}";
 
-            int responseCode = conn.getResponseCode();
-            System.out.println("Response Code: " + responseCode);
-
-            StringBuilder response = new StringBuilder();
-            try (BufferedReader br = new BufferedReader(
-                    new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
-                String responseLine;
-                while ((responseLine = br.readLine()) != null) {
-                    response.append(responseLine.trim());
+                try (OutputStream os = conn.getOutputStream()) {
+                    byte[] inputBytes = jsonInput.getBytes(StandardCharsets.UTF_8);
+                    os.write(inputBytes, 0, inputBytes.length);
                 }
+
+                int status = conn.getResponseCode();
+
+                if (status == 200) {
+                    StringBuilder response = new StringBuilder();
+                    try (BufferedReader br = new BufferedReader(
+                            new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8))) {
+                        String responseLine;
+                        while ((responseLine = br.readLine()) != null) {
+                            response.append(responseLine.trim());
+                        }
+                    }
+
+                    String intent = new ObjectMapper().readTree(response.toString()).get("intent").asText();
+
+                    return switch (intent) {
+                        case "contact" -> "คุณสามารถติดต่อเราได้ที่เบอร์โทร: 089-968-6309 หรือ Line ID: @capseal";
+                        case "price" -> "ราคาแคปซีลเริ่มต้นที่ 1.50 บาทต่อชิ้น (ขึ้นอยู่กับขนาดและปริมาณสั่ง) ครับ";
+                        case "order" -> "หากสนใจสั่งซื้อสามารถติดต่อผ่าน Line ID: @capseal หรือโทร 089-968-6309 ได้เลยครับ";
+                        default -> "สวัสดีครับ ยินดีต้อนรับสู่บริษัทสรรชัยพลาสติกมั่นคงจำกัด หากท่านต้องการสอบถามเกี่ยวกับแคปซีล เช่น ราคา เบอร์โทร หรือสั่งซื้อ พิมพ์มาได้เลยครับ!";
+                    };
+                } else {
+                    System.out.println("Attempt " + attempt + " failed with HTTP " + status);
+                }
+
+            } catch (IOException e) {
+                System.out.println("Attempt " + attempt + " failed: " + e.getMessage());
             }
 
-            JsonNode jsonNode = objectMapper.readTree(response.toString());
-            String intent = jsonNode.get("intent").asText();
-
-            return switch (intent) {
-                case "contact" -> "คุณสามารถติดต่อเราได้ที่เบอร์โทร: 089-968-6309 หรือ Line ID: @capseal";
-                case "price" -> "ราคาแคปซีลเริ่มต้นที่ 1.50 บาทต่อชิ้น (ขึ้นอยู่กับขนาดและปริมาณสั่ง) ครับ";
-                case "order" -> "หากสนใจสั่งซื้อสามารถติดต่อผ่าน Line ID: @capseal หรือโทร 089-968-6309 ได้เลยครับ";
-                default -> "สวัสดีครับ ยินดีต้อนรับสู่บริษัทสรรชัยพลาสติกมั่นคงจำกัด หากท่านต้องการสอบถามเกี่ยวกับแคปซีล เช่น ราคา เบอร์โทร หรือสั่งซื้อ พิมพ์มาได้เลยครับ!";
-            };
-
-        } catch (Exception e) {
-            System.err.println("Error calling intent API: " + e.getMessage());
-            e.printStackTrace();
-            return "ขออภัยในความไม่สะดวกระบบกำลังปรับปรุงในขณะนี้ครับ :)";
+            try {
+                Thread.sleep(retryDelayMillis); // หน่วงก่อน retry
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
         }
+
+        return "ขออภัย ระบบไม่สามารถประมวลผลคำถามของคุณได้ในขณะนี้ครับ";
     }
+
 
     private void replyToUser(String replyToken, String message) {
         TextMessage reply = new TextMessage(message);
