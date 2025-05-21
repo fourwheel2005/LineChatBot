@@ -18,6 +18,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 @RestController
 public class WebhookController {
@@ -34,11 +35,12 @@ public class WebhookController {
 
         for (Event event : events) {
             if (event instanceof MessageEvent) {
-                handleMessageEvent((MessageEvent<?>) event);
+                // ใช้ async ทำงาน background
+                CompletableFuture.runAsync(() -> handleMessageEvent((MessageEvent<?>) event));
             }
         }
 
-        return "OK";
+        return "OK"; // ตอบกลับไวทันที ไม่รอ processBusinessLogic
     }
 
     private void handleMessageEvent(MessageEvent<?> event) {
@@ -53,8 +55,8 @@ public class WebhookController {
     }
 
     private String processBusinessLogic(String input) {
-        int maxRetries = 3;
-        int retryDelayMillis = 2000; // หน่วงเวลา 2 วินาที
+        int maxRetries = 2;
+        int retryDelayMillis = 1000; // ลดเหลือ 1 วินาที
 
         for (int attempt = 1; attempt <= maxRetries; attempt++) {
             try {
@@ -100,7 +102,7 @@ public class WebhookController {
             }
 
             try {
-                Thread.sleep(retryDelayMillis); // หน่วงก่อน retry
+                Thread.sleep(retryDelayMillis); // รอแป๊บเดียว
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 break;
@@ -110,12 +112,11 @@ public class WebhookController {
         return "ขออภัย ระบบไม่สามารถประมวลผลคำถามของคุณได้ในขณะนี้ครับ";
     }
 
-
     private void replyToUser(String replyToken, String message) {
         TextMessage reply = new TextMessage(message);
         ReplyMessage replyMessage = new ReplyMessage(replyToken, reply);
         try {
-            lineMessagingClient.replyMessage(replyMessage).get();
+            lineMessagingClient.replyMessage(replyMessage).get(); // ยัง sync อยู่ แต่ใช้ใน background แล้ว
         } catch (Exception e) {
             e.printStackTrace();
         }
