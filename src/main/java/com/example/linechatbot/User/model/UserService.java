@@ -1,7 +1,5 @@
 package com.example.linechatbot.User.model;
 
-
-import com.example.linechatbot.User.model.User;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -21,7 +19,7 @@ public class UserService {
         return userRepository.save(user);
     }
 
-    public Optional<User> getUserById(Long id) {
+    public Optional<User> getUserById(String id) {
         return userRepository.findById(id);
     }
 
@@ -29,7 +27,7 @@ public class UserService {
         return userRepository.findAll();
     }
 
-    public User updateUser(Long id, User updatedUser) {
+    public User updateUser(String id, User updatedUser) {
         return userRepository.findById(id)
                 .map(user -> {
                     user.setName(updatedUser.getName());
@@ -38,7 +36,7 @@ public class UserService {
                 .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
     }
 
-    public void deleteUser(Long id) {
+    public void deleteUser(String id) {
         userRepository.deleteById(id);
     }
 
@@ -53,5 +51,4 @@ public class UserService {
             userRepository.save(user);
         }
     }
-
 }
