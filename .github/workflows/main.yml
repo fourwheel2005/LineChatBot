@@ -1,0 +1,17 @@
+name: test_ci
+
+on:
+  push:
+    branches:
+      - "main"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v4
+      -
+        name: Building...
+        run: echo "Github action work!!!🎉"
