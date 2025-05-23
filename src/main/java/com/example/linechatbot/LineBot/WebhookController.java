@@ -8,6 +8,7 @@ import com.linecorp.bot.client.LineMessagingClient;
 import com.linecorp.bot.model.ReplyMessage;
 import com.linecorp.bot.model.event.CallbackRequest;
 import com.linecorp.bot.model.event.Event;
+import com.linecorp.bot.model.event.FollowEvent;
 import com.linecorp.bot.model.event.MessageEvent;
 import com.linecorp.bot.model.event.message.TextMessageContent;
 import com.linecorp.bot.model.message.TextMessage;
@@ -31,6 +32,7 @@ public class WebhookController {
 
     @Autowired
     private LineMessagingClient lineMessagingClient;
+    @Autowired
     private UserRepository userRepository;
 
     private final ObjectMapper objectMapper = ModelObjectMapper.createNewObjectMapper();
@@ -44,13 +46,44 @@ public class WebhookController {
 
         for (Event event : events) {
             if (event instanceof MessageEvent) {
-                // ใช้ async ทำงาน background
                 CompletableFuture.runAsync(() -> handleMessageEvent((MessageEvent<?>) event));
+            } else if (event instanceof FollowEvent) {
+                CompletableFuture.runAsync(() -> handleFollowEvent((FollowEvent) event));
             }
         }
 
-        return "OK"; // ตอบกลับไวทันที ไม่รอ processBusinessLogic
+
+        return "OK";
     }
+
+    private void handleFollowEvent(FollowEvent event) {
+        String replyToken = event.getReplyToken();
+        String userId = event.getSource().getUserId();
+
+        try {
+            UserProfileResponse profile = lineMessagingClient.getProfile(userId).get();
+
+            if (!userRepository.existsById(userId)) {
+                User newUser = new User();
+                newUser.setUserId(userId);
+                newUser.setName(profile.getDisplayName());
+                newUser.setDisplayName(profile.getDisplayName());
+                newUser.setCreatedAt(LocalDateTime.now());
+                userRepository.save(newUser);
+            }
+
+            String welcomeMessage = """
+    สวัสดีครับคุณ %s 🙏🏻
+    ยินดีต้อนรับสู่บริษัทสรรชัยพลาสติกมั่นคงครับ 🎉
+    เราเป็นผู้เชี่ยวชาญด้านแคปซีล (Cap Seal) หากต้องการสอบถามข้อมูลเพิ่มเติม เช่น ราคา สั่งซื้อ หรือช่องทางติดต่อ สามารถพิมพ์ข้อความเข้ามาได้เลยครับ 😊
+    """.formatted(profile.getDisplayName());
+            replyToUser(replyToken, welcomeMessage);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
 
 
 
@@ -130,8 +163,16 @@ public class WebhookController {
                         case "contact" -> "คุณสามารถติดต่อเราได้ที่เบอร์โทร: 089-968-6309 หรือ Line ID: @capseal";
                         case "price" -> "ราคาแคปซีลเริ่มต้นที่ 1.50 บาทต่อชิ้น (ขึ้นอยู่กับขนาดและปริมาณสั่ง) ครับ";
                         case "order" -> "หากสนใจสั่งซื้อสามารถติดต่อผ่าน Line ID: @capseal หรือโทร 089-968-6309 ได้เลยครับ";
-                        default -> "สวัสดีครับ ยินดีต้อนรับสู่บริษัทสรรชัยพลาสติกมั่นคงจำกัด หากท่านต้องการสอบถามเกี่ยวกับแคปซีล เช่น ราคา เบอร์โทร หรือสั่งซื้อ พิมพ์มาได้เลยครับ!";
+                        default -> """
+        สวัสดีครับ ยินดีต้อนรับสู่บริษัทสรรชัยพลาสติกมั่นคงครับ 🙏🏻
+        หากต้องการสอบถามเรื่องแคปซีล เช่น  
+        🔹 ราคา  
+        🔹 เบอร์โทร  
+        🔹 หรือการสั่งซื้อ  
+        พิมพ์ข้อความเข้ามาได้เลยครับ 😊
+        """;
                     };
+
                 } else {
                     System.out.println("Attempt " + attempt + " failed with HTTP " + status);
                     try (BufferedReader br = new BufferedReader(
@@ -157,7 +198,7 @@ public class WebhookController {
             }
         }
 
-        return "ขออภัย ระบบไม่สามารถประมวลผลคำถามของคุณได้ในขณะนี้ครับ";
+        return "ขออภัย ระบบกำลังอยู่ระหว่างการปรับปรุงชั่วคราว ขออภัยในความไม่สะดวกครับ🙏🏻";
     }
 
 
@@ -170,4 +211,6 @@ public class WebhookController {
             e.printStackTrace();
         }
     }
+
+
 }
