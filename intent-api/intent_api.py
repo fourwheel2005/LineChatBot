@@ -41,11 +41,11 @@ intent_keywords = {
         "กี่วันถึง", "ส่งนานไหม", "ขอเบอร์คนส่ง", "ติดตามของ", "ขนส่งไหน"
     ],
     "working_hours": [
-        "เปิดกี่โมง", "เวลาทำการ", "เปิดวันไหน", "หยุดวันไหน",
+        "เปิดกี่โมง", "เวลาทำการ", "เปิดวันไหน", "หยุดวันไหน","เปิดปิดกี่โมง","เปิดกี่โมง",
         "ติดต่อได้เวลาไหน", "ตอบแชทกี่โมง", "เปิดทุกวันไหม", "ทำงานวันไหนบ้าง"
     ],
     "location": [
-        "ที่อยู่", "ตั้งอยู่ที่", "อยู่จังหวัดอะไร", "ไปหน้าร้านได้ไหม",
+        "ที่อยู่", "ตั้งอยู่ที่", "อยู่จังหวัดอะไร", "ไปหน้าร้านได้ไหม","อยู่ที่ไหน",
         "มีหน้าร้านไหม", "แผนที่", "พิกัด", "ร้านอยู่ที่ไหน", "สามารถไปรับเองได้ไหม"
     ]
 
@@ -60,26 +60,27 @@ intent_keywords = {
 @app.route("/analyze", methods=["POST"])
 def analyze():
     data = request.get_json(force=True)
-    text = data.get("text", "").strip()
-
+    text = data.get("text", "").strip().lower()
     if not text:
         return jsonify({"intent": "unknown"})
 
     tokens = word_tokenize(text, engine="newmm")
-    print(f"Tokens: {tokens}")  # DEBUG
+    print(f"[DEBUG] Text: {text}")
+    print(f"[DEBUG] Tokens: {tokens}")
 
     for intent, keywords in intent_keywords.items():
-        if any(word in tokens for word in keywords):
-            return jsonify({"intent": intent})
+        for keyword in keywords:
+            keyword = keyword.lower().strip()
+            if keyword in tokens or keyword in text:
+                print(f"[DEBUG] Matched intent '{intent}' with keyword: {keyword}")
+                return jsonify({"intent": intent})
 
     return jsonify({"intent": "unknown"})
 
-# เพิ่ม /ping endpoint สำหรับ health check
 @app.route("/ping", methods=["GET"])
 def ping():
     return "OK", 200
 
-# Run app
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
