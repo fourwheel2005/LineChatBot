@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify
 from pythainlp.tokenize import word_tokenize
+from rapidfuzz import fuzz
 import os
 
 app = Flask(__name__)
@@ -18,7 +19,7 @@ intent_keywords = {
     ],
     "order": [
         "สั่งซื้อ", "สั่ง", "อยากได้", "จะซื้อ", "สนใจ", "สั่งของ", "ขอสั่ง", "ขอซื้อ", "รับสินค้า", "ต้องการ",
-        "สั่งเลย", "ซื้อเลย", "จัดส่ง", "ขอใบเสนอราคา", "สั่งยังไง", "สั่งได้ที่ไหน", "มีของมั้ย", "มีไหม",
+        "สั่งเลย", "ซื้อเลย", "ขอใบเสนอราคา", "สั่งยังไง", "สั่งได้ที่ไหน", "มีของมั้ย", "มีไหม",
         "อยากสั่ง", "สั่งตรงไหน", "กดสั่ง", "สั่งด่วน", "ขอรายละเอียด", "มีขายมั้ย", "รับเลย",
         "สั่งเลยได้ไหม", "ซื้อยังไง", "ต้องทำไงถึงสั่งได้"
     ],
@@ -41,22 +42,15 @@ intent_keywords = {
         "กี่วันถึง", "ส่งนานไหม", "ขอเบอร์คนส่ง", "ติดตามของ", "ขนส่งไหน"
     ],
     "working_hours": [
-        "เปิดกี่โมง", "เวลาทำการ", "เปิดวันไหน", "หยุดวันไหน","เปิดปิดกี่โมง","เปิดกี่โมง",
+        "เปิดกี่โมง", "เวลาทำการ", "เปิดวันไหน", "หยุดวันไหน", "เปิดปิดกี่โมง", "เปิดกี่โมง",
         "ติดต่อได้เวลาไหน", "ตอบแชทกี่โมง", "เปิดทุกวันไหม", "ทำงานวันไหนบ้าง"
     ],
     "location": [
-        "ที่อยู่", "ตั้งอยู่ที่", "อยู่จังหวัดอะไร", "ไปหน้าร้านได้ไหม","อยู่ที่ไหน",
+        "ที่อยู่", "ตั้งอยู่ที่", "อยู่จังหวัดอะไร", "ไปหน้าร้านได้ไหม", "อยู่ที่ไหน",
         "มีหน้าร้านไหม", "แผนที่", "พิกัด", "ร้านอยู่ที่ไหน", "สามารถไปรับเองได้ไหม"
     ]
-
-
-
-
-
-
 }
 
-# Endpoint วิเคราะห์ intent
 @app.route("/analyze", methods=["POST"])
 def analyze():
     data = request.get_json(force=True)
@@ -68,12 +62,23 @@ def analyze():
     print(f"[DEBUG] Text: {text}")
     print(f"[DEBUG] Tokens: {tokens}")
 
+    THRESHOLD = 85  # ความคล้ายขั้นต่ำที่ยอมรับสำหรับ fuzzy matching
+
     for intent, keywords in intent_keywords.items():
         for keyword in keywords:
             keyword = keyword.lower().strip()
+
+            # Exact match
             if keyword in tokens or keyword in text:
-                print(f"[DEBUG] Matched intent '{intent}' with keyword: {keyword}")
+                print(f"[DEBUG] Exact match: {keyword}")
                 return jsonify({"intent": intent})
+
+            # Fuzzy match (จับคำที่พิมพ์ตก/ผิด)
+            for token in tokens:
+                score = fuzz.ratio(keyword, token)
+                if score >= THRESHOLD:
+                    print(f"[DEBUG] Fuzzy match: '{token}' ≈ '{keyword}' with score {score}")
+                    return jsonify({"intent": intent})
 
     return jsonify({"intent": "unknown"})
 
