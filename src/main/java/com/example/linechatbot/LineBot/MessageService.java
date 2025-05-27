@@ -37,6 +37,9 @@ public class MessageService {
     @Autowired
     private LineBotService lineBotService;
 
+    @Autowired
+    private  FeedbackScheduler feedbackScheduler;
+
     public void handleMessageEvent(MessageEvent<?> event) {
         if (!(event.getMessage() instanceof TextMessageContent messageContent)) return;
 
@@ -45,6 +48,9 @@ public class MessageService {
         String userId = event.getSource().getUserId();
 
         try {
+            // ผู้ใช้พิมพ์อะไรมาใหม่ ให้ยกเลิก feedback เดิมก่อน
+            feedbackScheduler.cancelFeedback(userId);
+
             UserProfileResponse profile = lineMessagingClient.getProfile(userId).get();
             LocalDateTime now = LocalDateTime.now();
             boolean showWelcomeBack = false;
@@ -66,6 +72,7 @@ public class MessageService {
                 return;
             }
 
+            // ตรวจสอบข้อมูลผู้ใช้
             User user = userRepository.findById(userId).orElse(null);
             if (user == null) {
                 user = new User();
@@ -84,16 +91,22 @@ public class MessageService {
             userRepository.save(user);
 
             String replyText = processBusinessLogic(userMessage);
+            boolean shouldAskFeedback = !replyText.contains("ยินดีต้อนรับสู่");
+
             if (showWelcomeBack) {
                 String welcomeBackMessage = String.format("""
-                    👋 ยินดีต้อนรับกลับมาครับคุณ %s  
-                    หากมีคำถามเกี่ยวกับแคปซีล เช่น ราคา สั่งซื้อ หรือขนส่ง สามารถพิมพ์เข้ามาได้เลยครับ 😊
-                    """, user.getDisplayName());
+                👋 ยินดีต้อนรับกลับมาครับคุณ %s  
+                หากมีคำถามเกี่ยวกับแคปซีล เช่น ราคา สั่งซื้อ หรือขนส่ง สามารถพิมพ์เข้ามาได้เลยครับ 😊
+                """, user.getDisplayName());
                 replyText = welcomeBackMessage + "\n\n" + replyText;
             }
 
             lineBotService.replyToUser(replyToken, replyText);
-            lineBotService.pushFeedbackQuickReply(userId);
+
+            // ตั้งเวลา feedback 30 วิ เฉพาะกรณีไม่ใช่ข้อความ welcome
+            if (shouldAskFeedback) {
+                feedbackScheduler.scheduleFeedback(userId);
+            }
 
         } catch (Exception e) {
             e.printStackTrace();
