@@ -20,4 +20,7 @@ public class User {
 
     private String displayName;
     private LocalDateTime createdAt;
+
+    private LocalDateTime lastMessageAt;
+
 }
